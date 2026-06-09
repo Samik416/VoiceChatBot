@@ -1,0 +1,17 @@
+# Python virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Temporary audio files
+temp.webm
+temp.wav
+temp.mp3

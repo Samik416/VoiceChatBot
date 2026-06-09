@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Chatbot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #0d0f0f;
+      --surface:   #141718;
+      --border:    #2a2d2e;
+      --accent:    #00e5a0;
+      --accent2:   #00bfff;
+      --danger:    #ff4d6d;
+      --text:      #e2e8e4;
+      --muted:     #5a6360;
+      --user-bg:   #1a2420;
+      --ai-bg:     #141c1a;
+      --radius:    6px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      overflow: hidden;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 780px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 20px 16px;
+      gap: 12px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      animation: fadeDown 0.5s ease both;
+    }
+
+    .logo {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .status-pill .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    .status-pill.listening .dot  { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+    .status-pill.listening       { color: var(--danger); border-color: var(--danger); }
+    .status-pill.speaking .dot   { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+    .status-pill.speaking        { color: var(--accent2); border-color: var(--accent2); }
+    .status-pill.thinking .dot   { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: pulse 1s ease-in-out infinite; }
+    .status-pill.thinking        { color: var(--accent); border-color: var(--accent); }
+
+    /* Chatbox */
+    #chatbox {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-right: 4px;
+      animation: fadeUp 0.5s ease 0.1s both;
+    }
+
+    #chatbox::-webkit-scrollbar { width: 4px; }
+    #chatbox::-webkit-scrollbar-track { background: transparent; }
+    #chatbox::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      animation: msgIn 0.25s ease both;
+      max-width: 100%;
+    }
+
+    .msg .label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .msg.user {
+      background: var(--user-bg);
+      border-left: 2px solid var(--accent);
+    }
+    .msg.user .label { color: var(--accent); }
+
+    .msg.ai {
+      background: var(--ai-bg);
+      border-left: 2px solid var(--accent2);
+    }
+    .msg.ai .label { color: var(--accent2); }
+
+    .msg.system {
+      background: transparent;
+      border-left: 2px solid var(--border);
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    /* Thinking indicator */
+    .thinking-dots {
+      display: flex; gap: 4px; align-items: center; padding: 4px 0;
+    }
+    .thinking-dots span {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent2);
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Input row */
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      transition: border-color 0.2s;
+      animation: fadeUp 0.5s ease 0.2s both;
+    }
+
+    .input-row:focus-within {
+      border-color: var(--accent);
+    }
+
+    #userInput {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.9rem;
+      padding: 4px 2px;
+    }
+
+    #userInput::placeholder { color: var(--muted); }
+
+    /* Buttons */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      padding: 7px 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0d0f0f;
+      font-weight: 600;
+    }
+    .btn.primary:hover { background: #00ffb3; border-color: #00ffb3; }
+
+    .btn.mic-active {
+      border-color: var(--danger);
+      color: var(--danger);
+      animation: ringPulse 1s ease-in-out infinite;
+    }
+
+    /* Spinner inline */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top: 2px solid #0d0f0f;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    /* Waveform bars for speaking state */
+    .wave { display: flex; gap: 2px; align-items: center; height: 16px; }
+    .wave span {
+      display: block; width: 3px; background: var(--accent2);
+      border-radius: 2px;
+      animation: wave 0.8s ease-in-out infinite;
+    }
+    .wave span:nth-child(1) { height: 4px;  animation-delay: 0s; }
+    .wave span:nth-child(2) { height: 12px; animation-delay: 0.1s; }
+    .wave span:nth-child(3) { height: 8px;  animation-delay: 0.2s; }
+    .wave span:nth-child(4) { height: 14px; animation-delay: 0.15s; }
+    .wave span:nth-child(5) { height: 5px;  animation-delay: 0.05s; }
+
+    /* Footer hint */
+    footer {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--muted);
+      text-align: center;
+      opacity: 0.5;
+      animation: fadeUp 0.5s ease 0.3s both;
+    }
+
+    /* Keyframes */
+    @keyframes spin     { to { transform: rotate(360deg); } }
+    @keyframes pulse    { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    @keyframes blink    { 0%,80%,100% { opacity:0.2; } 40% { opacity:1; } }
+    @keyframes wave     { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(0.3); } }
+    @keyframes msgIn    { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+    @keyframes fadeDown { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform:none; } }
+    @keyframes fadeUp   { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
+    @keyframes ringPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,109,0.4); } 50% { box-shadow: 0 0 0 6px rgba(255,77,109,0); } }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header>
+    <div class="logo">⬡ AI Chatbot</div>
+    <div class="status-pill" id="statusPill">
+      <span class="dot"></span>
+      <span id="statusText">ready</span>
+    </div>
+  </header>
+
+  <div id="chatbox">
+    <div class="msg system">// Session started. Type or use voice controls below.</div>
+  </div>
+
+  <div class="input-row">
+    <input type="text" id="userInput" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendMessage()" />
+    <button class="btn" id="voiceModeBtn" onclick="toggleVoiceMode()">
+      🎧 <span id="voiceModeLabel">VOICE MODE</span>
+    </button>
+    <button class="btn" id="micBtn" onclick="toggleMic()" title="Voice input">
+      🎤 <span id="micLabel">MIC</span>
+    </button>
+    <button class="btn" id="speakBtn" onclick="speak()" title="Speak last reply">
+      🔊 <span id="speakLabel">SPEAK</span>
+    </button>
+    <button class="btn primary" id="sendBtn" onclick="sendMessage()">
+      <span id="sendLabel">SEND</span>
+    </button>
+  </div>
+
+  <footer>↵ enter to send &nbsp;·&nbsp; mic for voice input &nbsp;·&nbsp; speak to hear last reply</footer>
+
+</div>
+
+<script src="js/voiceMode.js"></script>
+<script src="js/speechToText.js"></script>
+<script src="js/chatbot.js"></script>
+<script src="js/textToSpeech.js"></script>
+
+</body>
+</html>
