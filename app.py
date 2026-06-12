@@ -5,6 +5,12 @@ from pydantic import BaseModel
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import os
+import subprocess
+import sys
+import signal
+
+
+voice_process = None
 
 # Load environment variables
 load_dotenv()
@@ -24,6 +30,49 @@ app.add_middleware(
 client = AsyncOpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
 )
+
+@app.post("/start_voice")
+async def start_voice():
+
+    global voice_process
+
+    if (
+        voice_process is None
+        or voice_process.poll() is not None
+    ):
+
+        voice_process = subprocess.Popen([
+            sys.executable,
+            "bot.py"
+        ])
+
+    return {
+        "status": "running"
+    }
+
+@app.post("/stop_voice")
+async def stop_voice():
+
+    global voice_process
+
+    if (
+        voice_process is not None
+        and voice_process.poll() is None
+    ):
+
+        voice_process.terminate()
+
+        voice_process.wait()
+
+        voice_process = None
+
+        return {
+            "status": "stopped"
+        }
+
+    return {
+        "status": "not running"
+    }
 
 # Root route
 @app.get("/")
@@ -49,7 +98,7 @@ async def chat(message: Message):
         "reply": response.output_text
     }
 
-
+"""
 @app.post("/voice")
 async def voice_chat(audio: UploadFile = File(...)):
 
@@ -112,3 +161,4 @@ async def voice_chat(audio: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_file):
             os.remove(temp_file)
+"""
